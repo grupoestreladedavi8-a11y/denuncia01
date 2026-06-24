@@ -1,151 +1,436 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
+
 <head>
+
 <meta charset="UTF-8">
-<title>Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Painel Administrativo</title>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="/socket.io/socket.io.js"></script>
 
 <style>
 
-body {
-    margin: 0;
-    display: flex;
-    font-family: Arial;
+*{
+    box-sizing:border-box;
 }
 
-#left {
-    width: 40%;
-    height: 100vh;
-    overflow: auto;
-    border-right: 1px solid #ccc;
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:#f5f7fb;
 }
 
-#map {
-    width: 60%;
-    height: 100vh;
+.header{
+    background:#1f4e79;
+    color:white;
+    padding:15px;
+    font-size:20px;
+    font-weight:bold;
 }
 
-table {
-    width: 100%;
-    font-size: 12px;
-    border-collapse: collapse;
+.container{
+    display:flex;
+    height:calc(100vh - 60px);
 }
 
-td, th {
-    border: 1px solid #ddd;
-    padding: 6px;
+.left{
+    width:45%;
+    overflow:auto;
+    border-right:1px solid #ddd;
+    background:white;
 }
 
-th {
-    background: #eee;
+.right{
+    width:55%;
+}
+
+#map{
+    width:100%;
+    height:100%;
+}
+
+.stats{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    padding:10px;
+}
+
+.card{
+    background:#eef4fb;
+    padding:12px;
+    border-radius:10px;
+    text-align:center;
+}
+
+.card h2{
+    margin:0;
+    color:#1f4e79;
+}
+
+.filters{
+    padding:10px;
+}
+
+.filters input{
+    width:100%;
+    padding:10px;
+    border:1px solid #ccc;
+    border-radius:8px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+}
+
+th{
+    background:#1f4e79;
+    color:white;
+}
+
+th,td{
+    border:1px solid #ddd;
+    padding:6px;
+}
+
+tr:hover{
+    background:#f4f4f4;
+    cursor:pointer;
+}
+
+.details{
+    padding:12px;
+    border-top:1px solid #ddd;
+    background:#fafafa;
+}
+
+.details h3{
+    margin-top:0;
+}
+
+.badge{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:6px;
+    background:#1f4e79;
+    color:white;
+    font-size:11px;
 }
 
 </style>
+
 </head>
 
 <body>
 
-<div id="left">
-<table>
-<thead>
-<tr>
-<th>ID</th><th>Telefone</th><th>IP</th><th>Cidade</th><th>Data</th>
-</tr>
-</thead>
-<tbody id="tbody"></tbody>
-</table>
+<div class="header">
+Painel Administrativo de Ocorrências
 </div>
 
+<div class="container">
+
+<div class="left">
+
+<div class="stats">
+
+<div class="card">
+<h2 id="totalRegistros">0</h2>
+<div>Total de Registros</div>
+</div>
+
+<div class="card">
+<h2 id="totalMapa">0</h2>
+<div>Com GPS</div>
+</div>
+
+</div>
+
+<div class="filters">
+<input
+type="text"
+id="busca"
+placeholder="Pesquisar..."
+onkeyup="render()">
+</div>
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Telefone</th>
+<th>IP</th>
+<th>Data</th>
+</tr>
+
+</thead>
+
+<tbody id="tbody"></tbody>
+
+</table>
+
+<div class="details" id="details">
+
+<h3>Nenhum registro selecionado</h3>
+
+Clique em um marcador no mapa para visualizar os detalhes.
+
+</div>
+
+</div>
+
+<div class="right">
+
 <div id="map"></div>
+
+</div>
+
+</div>
 
 <script>
 
 const socket = io();
-let map = L.map('map').setView([-23.55,-46.63], 11);
 
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-let markers = new Map();
 let leads = [];
+let markers = new Map();
 
-/* parse seguro */
+const map = L.map("map").setView([-23.55,-46.63],11);
+
+L.tileLayer(
+"https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+{
+maxZoom:19
+}
+).addTo(map);
+
 function safe(v){
-    try { return typeof v === "string" ? JSON.parse(v) : v; }
-    catch { return {}; }
+
+    try{
+
+        if(!v) return {};
+
+        return typeof v === "string"
+            ? JSON.parse(v)
+            : v;
+
+    }catch{
+
+        return {};
+    }
 }
 
-/* LOAD */
 async function load(){
 
-    const res = await fetch("/api/leads");
+    try{
 
-    if(!res.ok){
-        console.log("Erro API:", res.status);
-        return;
+        const res = await fetch("/api/leads");
+
+        if(!res.ok){
+
+            console.error("Erro API",res.status);
+            return;
+        }
+
+        leads = await res.json();
+
+        document.getElementById("totalRegistros").innerText = leads.length;
+
+        render();
+
+        leads.forEach(addMarker);
+
+    }catch(err){
+
+        console.error(err);
     }
-
-    leads = await res.json();
-
-    render();
-    leads.forEach(addMarker);
 }
+    function render(){
 
-/* tabela */
-function render(){
+    const termo =
+        document.getElementById("busca")
+        .value
+        .toLowerCase();
 
-    const tb = document.getElementById("tbody");
-    tb.innerHTML = "";
+    const tbody =
+        document.getElementById("tbody");
 
-    leads.forEach(l => {
+    tbody.innerHTML = "";
 
-        const extra = safe(l.extra_info);
-        const geo = extra.geo || {};
+    const filtrados = leads.filter(l => {
 
-        tb.innerHTML += `
-        <tr>
-            <td>${l.id}</td>
-            <td>${l.phone}</td>
-            <td>${l.ip}</td>
-            <td>${geo.city || "-"}</td>
-            <td>${l.created_at}</td>
-        </tr>`;
+        return JSON.stringify(l)
+        .toLowerCase()
+        .includes(termo);
+
     });
+
+    filtrados.forEach(l => {
+
+        tbody.innerHTML += `
+        <tr onclick="showDetails(${l.id})">
+            <td>${l.id}</td>
+            <td>${l.phone || "-"}</td>
+            <td>${l.ip || "-"}</td>
+            <td>${l.created_at || "-"}</td>
+        </tr>
+        `;
+    });
+
+    document.getElementById(
+        "totalRegistros"
+    ).innerText = filtrados.length;
 }
 
-/* mapa */
+function showDetails(id){
+
+    const l =
+        leads.find(x => x.id == id);
+
+    if(!l) return;
+
+    const extra =
+        safe(l.extra_info);
+
+    document.getElementById(
+        "details"
+    ).innerHTML = `
+
+    <h3>
+    Ocorrência #${l.id}
+    </h3>
+
+    <p>
+    <span class="badge">
+    Registro
+    </span>
+    </p>
+
+    <b>Telefone:</b><br>
+    ${l.phone || "-"}
+    <br><br>
+
+    <b>IP:</b><br>
+    ${l.ip || "-"}
+    <br><br>
+
+    <b>Data:</b><br>
+    ${l.created_at || "-"}
+    <br><br>
+
+    <b>Latitude:</b><br>
+    ${l.latitude || "-"}
+    <br><br>
+
+    <b>Longitude:</b><br>
+    ${l.longitude || "-"}
+    <br><br>
+
+    <b>Tipo:</b><br>
+    ${extra.tipo || "-"}
+    <br><br>
+
+    <b>Descrição:</b><br>
+    ${extra.descricao || "-"}
+    <br><br>
+
+    <b>Data/Hora do acidente:</b><br>
+    ${extra.dataHora || "-"}
+    <br><br>
+
+    <b>Local:</b><br>
+    ${extra.localEmpresa || "-"}
+    <br><br>
+
+    <b>Atendimento:</b><br>
+    ${extra.atendimento || "-"}
+    <br><br>
+
+    <b>Detalhes do atendimento:</b><br>
+    ${extra.detalhesAtendimento || "-"}
+    <br><br>
+
+    <b>EPI:</b><br>
+    ${extra.epi || "-"}
+    <br><br>
+
+    <b>Quais EPIs:</b><br>
+    ${extra.quaisEpi || "-"}
+    <br><br>
+
+    <b>Família comunicada:</b><br>
+    ${extra.familia || "-"}
+    <br><br>
+
+    <b>Observações:</b><br>
+    ${extra.obs || "-"}
+    <br><br>
+
+    <a
+    target="_blank"
+    href="https://www.google.com/maps?q=${l.latitude},${l.longitude}">
+    Abrir no Google Maps
+    </a>
+    `;
+}
+
 function addMarker(l){
 
-    const lat = parseFloat(l.latitude);
-    const lng = parseFloat(l.longitude);
+    const lat =
+        parseFloat(l.latitude);
 
-    if(isNaN(lat) || isNaN(lng)) return;
-    if(markers.has(l.id)) return;
+    const lng =
+        parseFloat(l.longitude);
 
-    const m = L.marker([lat,lng]).addTo(map);
+    if(
+        isNaN(lat) ||
+        isNaN(lng)
+    ) return;
 
-    const extra = safe(l.extra_info);
-    const geo = extra.geo || {};
+    if(
+        markers.has(l.id)
+    ) return;
 
-    m.bindPopup(`
-        ${l.phone}<br>
-        ${l.ip}<br>
-        ${geo.city || ""}<br>
-        ${l.created_at}
-    `);
+    const marker =
+        L.marker([lat,lng])
+        .addTo(map);
 
-    markers.set(l.id,m);
+    marker.bindPopup(
+        `<b>Registro #${l.id}</b>`
+    );
+
+    marker.on("click", () => {
+
+        showDetails(l.id);
+
+    });
+
+    markers.set(
+        l.id,
+        marker
+    );
 }
 
-/* tempo real */
-socket.on("new-lead", (l) => {
+socket.on(
+"new-lead",
+(lead)=>{
 
-    leads.unshift(l);
+    leads.unshift(
+        lead
+    );
 
     render();
-    addMarker(l);
+
+    addMarker(
+        lead
+    );
 });
 
 load();
