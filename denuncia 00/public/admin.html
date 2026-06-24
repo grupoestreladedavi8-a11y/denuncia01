@@ -144,6 +144,7 @@ Painel Administrativo de Ocorrências
 <h2 id="totalRegistros">0</h2>
 <div>Total de Registros</div>
 </div>
+<div class="card"><h2 id="totalVisitantes">0</h2><div>Visitantes</div></div>
 
 <div class="card">
 <h2 id="totalMapa">0</h2>
@@ -240,6 +241,11 @@ async function load(){
         }
 
         leads = await res.json();
+try{
+const v=await fetch('/api/visitors');
+const visitors=await v.json();
+document.getElementById('totalVisitantes').innerText=visitors.length;
+}catch(e){}
 
         document.getElementById("totalRegistros").innerText = leads.length;
 
