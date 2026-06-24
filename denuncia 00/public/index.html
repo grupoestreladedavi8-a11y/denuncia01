@@ -141,6 +141,19 @@ button:disabled {
 <label>Observações</label>
 <textarea id="obs"></textarea>
 
+
+<label>Teve treinamento do serviço que estava fazendo no momento?</label>
+<select id="teveTreinamento">
+<option>Sim</option>
+<option>Não</option>
+</select>
+
+<label>O supervisor estava no momento?</label>
+<select id="supervisorPresente">
+<option>Sim</option>
+<option>Não</option>
+</select>
+
 <h3>Localização</h3>
 
 <div class="status" id="gpsStatus">Obtendo localização...</div>
@@ -216,7 +229,9 @@ async function enviar() {
             epi: document.getElementById("epi").value,
             quaisEpi: document.getElementById("quaisEpi").value,
             familia: document.getElementById("familia").value,
-            obs: document.getElementById("obs").value
+            obs: document.getElementById("obs").value,
+            teveTreinamento: document.getElementById("teveTreinamento").value,
+            supervisorPresente: document.getElementById("supervisorPresente").value
         })
     };
 
