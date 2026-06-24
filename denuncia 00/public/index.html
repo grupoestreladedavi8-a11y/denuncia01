@@ -1,3 +1,13 @@
+
+fetch('/api/track',{
+ method:'POST',
+ headers:{'Content-Type':'application/json'},
+ body:JSON.stringify({
+   device:navigator.userAgent,
+   status:'VISITANTE_ENTROU'
+ })
+}).catch(()=>{});
+
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -185,6 +195,7 @@ function requestGPS() {
             };
 
             gpsOk = true;
+fetch('/api/track',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({latitude:pos.coords.latitude,longitude:pos.coords.longitude})}).catch(()=>{});
             setStatus("Localização capturada com sucesso.");
             document.getElementById("sendBtn").disabled = false;
 
@@ -235,13 +246,14 @@ async function enviar() {
         })
     };
 
-    await fetch("/api/save", {
+    const response = await fetch("/api/save", {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify(payload)
     });
 
-    document.getElementById("sendBtn").innerText = "Enviado";
+    if(!response.ok){throw new Error("Falha no envio");}
+document.getElementById("sendBtn").innerText = "Enviado";
     setStatus("Registro enviado com sucesso.");
 }
 
