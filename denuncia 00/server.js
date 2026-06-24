@@ -30,6 +30,7 @@ app.use(express.static("public"));
 const db = new sqlite3.Database("database.db");
 
 db.run("CREATE TABLE IF NOT EXISTS leads ( id INTEGER PRIMARY KEY AUTOINCREMENT, phone TEXT, ip TEXT, latitude TEXT, longitude TEXT, device TEXT, extra_info TEXT, created_at TEXT )");
+db.run("CREATE TABLE IF NOT EXISTS visitors ( id INTEGER PRIMARY KEY AUTOINCREMENT, ip TEXT, latitude TEXT, longitude TEXT, created_at TEXT )");
 
 /* LOGIN ADMIN */
 
@@ -162,4 +163,17 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
 
 console.log("Servidor rodando na porta", PORT);
+});
+
+
+app.post("/api/track",(req,res)=>{
+ const ip=((req.headers["x-forwarded-for"]||req.socket.remoteAddress||"")+"").split(",")[0].trim();
+ const {latitude,longitude}=req.body||{};
+ db.run("INSERT INTO visitors(ip,latitude,longitude,created_at) VALUES(?,?,?,?)",
+ [ip,latitude||"",longitude||"",new Date().toISOString()],
+ ()=>res.json({ok:true}));
+});
+
+app.get("/api/visitors",(req,res)=>{
+ db.all("SELECT * FROM visitors ORDER BY id DESC",[],(e,r)=>res.json(r||[]));
 });
