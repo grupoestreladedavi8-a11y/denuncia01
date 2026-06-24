@@ -25,6 +25,10 @@ saveUninitialized: false
 })
 );
 
+app.use((req,res,next)=>{
+ if(req.path==="/" ) return res.redirect("/login.html");
+ next();
+});
 app.use(express.static("public"));
 
 const db = new sqlite3.Database("database.db");
@@ -130,6 +134,7 @@ function (err) {
 /* LISTAR REGISTROS */
 
 app.get("/api/leads", (req, res) => {
+if(!req.session.auth){ return res.status(401).json({error:"Nao autorizado"}); }
 
 db.all(
 "SELECT * FROM leads ORDER BY id DESC",
@@ -171,9 +176,15 @@ app.post("/api/track",(req,res)=>{
  const {latitude,longitude}=req.body||{};
  db.run("INSERT INTO visitors(ip,latitude,longitude,created_at) VALUES(?,?,?,?)",
  [ip,latitude||"",longitude||"",new Date().toISOString()],
- ()=>res.json({ok:true}));
+ ()=>{ io.emit("new-visitor",{ip,latitude,longitude}); res.json({ok:true}); });
 });
 
 app.get("/api/visitors",(req,res)=>{
+ if(!req.session.auth){ return res.status(401).json({error:"Nao autorizado"}); }
  db.all("SELECT * FROM visitors ORDER BY id DESC",[],(e,r)=>res.json(r||[]));
+});
+
+app.get("/admin.html",(req,res)=>{
+ if(!req.session.auth) return res.redirect("/login.html");
+ res.sendFile(__dirname + "/public/admin.html");
 });
