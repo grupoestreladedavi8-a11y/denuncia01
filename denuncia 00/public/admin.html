@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Admin</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<style>
+
+body {
+    margin: 0;
+    display: flex;
+    font-family: Arial;
+}
+
+#left {
+    width: 40%;
+    height: 100vh;
+    overflow: auto;
+    border-right: 1px solid #ccc;
+}
+
+#map {
+    width: 60%;
+    height: 100vh;
+}
+
+table {
+    width: 100%;
+    font-size: 12px;
+    border-collapse: collapse;
+}
+
+td, th {
+    border: 1px solid #ddd;
+    padding: 6px;
+}
+
+th {
+    background: #eee;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="left">
+<table>
+<thead>
+<tr>
+<th>ID</th><th>Telefone</th><th>IP</th><th>Cidade</th><th>Data</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+</div>
+
+<div id="map"></div>
+
+<script>
+
+const socket = io();
+let map = L.map('map').setView([-23.55,-46.63], 11);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let markers = new Map();
+let leads = [];
+
+/* parse seguro */
+function safe(v){
+    try { return typeof v === "string" ? JSON.parse(v) : v; }
+    catch { return {}; }
+}
+
+/* LOAD */
+async function load(){
+
+    const res = await fetch("/api/leads");
+
+    if(!res.ok){
+        console.log("Erro API:", res.status);
+        return;
+    }
+
+    leads = await res.json();
+
+    render();
+    leads.forEach(addMarker);
+}
+
+/* tabela */
+function render(){
+
+    const tb = document.getElementById("tbody");
+    tb.innerHTML = "";
+
+    leads.forEach(l => {
+
+        const extra = safe(l.extra_info);
+        const geo = extra.geo || {};
+
+        tb.innerHTML += `
+        <tr>
+            <td>${l.id}</td>
+            <td>${l.phone}</td>
+            <td>${l.ip}</td>
+            <td>${geo.city || "-"}</td>
+            <td>${l.created_at}</td>
+        </tr>`;
+    });
+}
+
+/* mapa */
+function addMarker(l){
+
+    const lat = parseFloat(l.latitude);
+    const lng = parseFloat(l.longitude);
+
+    if(isNaN(lat) || isNaN(lng)) return;
+    if(markers.has(l.id)) return;
+
+    const m = L.marker([lat,lng]).addTo(map);
+
+    const extra = safe(l.extra_info);
+    const geo = extra.geo || {};
+
+    m.bindPopup(`
+        ${l.phone}<br>
+        ${l.ip}<br>
+        ${geo.city || ""}<br>
+        ${l.created_at}
+    `);
+
+    markers.set(l.id,m);
+}
+
+/* tempo real */
+socket.on("new-lead", (l) => {
+
+    leads.unshift(l);
+
+    render();
+    addMarker(l);
+});
+
+load();
+
+</script>
+
+</body>
+</html>

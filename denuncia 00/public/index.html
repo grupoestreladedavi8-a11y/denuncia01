@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Registro de Acidente</title>
+
+<style>
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f4f7fb;
+}
+
+.container {
+    max-width: 900px;
+    margin: 12px auto;
+    background: white;
+    padding: 18px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.08);
+}
+
+h1 {
+    text-align: center;
+    color: #1f4e79;
+    font-size: 20px;
+}
+
+h3 {
+    color: #1f4e79;
+    border-left: 4px solid #1f4e79;
+    padding-left: 10px;
+    font-size: 15px;
+}
+
+label {
+    font-weight: bold;
+    display: block;
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+input, textarea, select {
+    width: 100%;
+    padding: 12px;
+    margin-top: 6px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+}
+
+textarea { height: 90px; resize: none; }
+
+button {
+    background: #1f4e79;
+    color: white;
+    border: none;
+    padding: 15px;
+    width: 100%;
+    margin-top: 18px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:disabled {
+    background: #999;
+}
+
+.status {
+    font-size: 13px;
+    margin-top: 10px;
+    color: #555;
+    text-align: center;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>Registro de Acidente de Trabalho</h1>
+
+<h3>Identificação</h3>
+
+<label>Você é:</label>
+<select id="tipo">
+<option>Vítima</option>
+<option>Testemunha</option>
+</select>
+
+<h3>Ocorrido</h3>
+
+<label>Descrição</label>
+<textarea id="descricao"></textarea>
+
+<label>Data e hora</label>
+<input type="datetime-local" id="dataHora">
+
+<label>Local</label>
+<input id="localEmpresa">
+
+<h3>Atendimento</h3>
+
+<label>Recebeu atendimento?</label>
+<select id="atendimento">
+<option>Sim</option>
+<option>Não</option>
+</select>
+
+<label>Detalhes</label>
+<textarea id="detalhesAtendimento"></textarea>
+
+<h3>EPIs</h3>
+
+<label>Usava EPI?</label>
+<select id="epi">
+<option>Sim</option>
+<option>Não</option>
+<option>Parcialmente</option>
+</select>
+
+<label>Quais?</label>
+<input id="quaisEpi">
+
+<h3>Comunicação</h3>
+
+<label>Família foi comunicada?</label>
+<select id="familia">
+<option>Sim</option>
+<option>Não</option>
+</select>
+
+<label>Observações</label>
+<textarea id="obs"></textarea>
+
+<h3>Localização</h3>
+
+<div class="status" id="gpsStatus">Obtendo localização...</div>
+
+<button id="sendBtn" onclick="enviar()" disabled>
+Enviar registro
+</button>
+
+</div>
+
+<script>
+
+let gps = null;
+let gpsOk = false;
+
+function setStatus(msg){
+    document.getElementById("gpsStatus").innerText = msg;
+}
+
+/* GPS obrigatório */
+function requestGPS() {
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+
+            gps = {
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude
+            };
+
+            gpsOk = true;
+            setStatus("Localização capturada com sucesso.");
+            document.getElementById("sendBtn").disabled = false;
+
+        },
+        () => {
+            gpsOk = false;
+            setStatus("Permita a localização para enviar o formulário.");
+            document.getElementById("sendBtn").disabled = true;
+        },
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+        }
+    );
+}
+
+/* ENVIO */
+async function enviar() {
+
+    if (!gpsOk) {
+        alert("Localização obrigatória.");
+        requestGPS();
+        return;
+    }
+
+    document.getElementById("sendBtn").disabled = true;
+    document.getElementById("sendBtn").innerText = "Enviando...";
+
+    const payload = {
+        phone: "FORM-ACIDENTE",
+        latitude: gps.latitude,
+        longitude: gps.longitude,
+        device: navigator.userAgent,
+        extra_info: JSON.stringify({
+            tipo: document.getElementById("tipo").value,
+            descricao: document.getElementById("descricao").value,
+            dataHora: document.getElementById("dataHora").value,
+            localEmpresa: document.getElementById("localEmpresa").value,
+            atendimento: document.getElementById("atendimento").value,
+            detalhesAtendimento: document.getElementById("detalhesAtendimento").value,
+            epi: document.getElementById("epi").value,
+            quaisEpi: document.getElementById("quaisEpi").value,
+            familia: document.getElementById("familia").value,
+            obs: document.getElementById("obs").value
+        })
+    };
+
+    await fetch("/api/save", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    document.getElementById("sendBtn").innerText = "Enviado";
+    setStatus("Registro enviado com sucesso.");
+}
+
+window.onload = () => {
+    document.getElementById("sendBtn").disabled = true;
+    requestGPS();
+};
+
+</script>
+
+</body>
+</html>
