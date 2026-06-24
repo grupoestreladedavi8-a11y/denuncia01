@@ -445,3 +445,8 @@ load();
 
 </body>
 </html>
+
+<script>
+socket.on("new-visitor",()=>load());
+socket.on("new-lead",()=>load());
+</script>
