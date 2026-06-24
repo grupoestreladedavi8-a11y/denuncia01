@@ -25,10 +25,6 @@ saveUninitialized: false
 })
 );
 
-app.use((req,res,next)=>{
- if(req.path==="/" ) return res.redirect("/login.html");
- next();
-});
 app.use(express.static("public"));
 
 const db = new sqlite3.Database("database.db");
